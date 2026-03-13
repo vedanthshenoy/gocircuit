@@ -1,0 +1,14 @@
+{
+  "sine_wave": {
+    "equation": "A * sin(2 * pi * f * t + phi)",
+    "params": ["A", "f", "phi"]
+  },
+  "square_wave": {
+    "equation": "A * sign(sin(2 * pi * f * t))",
+    "params": ["A", "f"]
+  },
+  "sawtooth_wave": {
+    "equation": "2 * A * (t * f - floor(0.5 + t * f))",
+    "params": ["A", "f"]
+  }
+}
