@@ -3,7 +3,7 @@ import { useCircuit } from '../../store/circuit-store';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const OutputWaveform: React.FC = () => {
-  const { simulationResult, inputWaveform } = useCircuit();
+  const { simulationResult, inputWaveform, selectedId } = useCircuit();
 
   const data = useMemo(() => {
     if (!simulationResult) return [];
@@ -24,6 +24,10 @@ const OutputWaveform: React.FC = () => {
       </div>
     );
   }
+
+  const visibleNodes = Object.keys(simulationResult.voltages).filter(node => 
+    node === 'In' || node === 'Out' || node === selectedId
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -53,15 +57,15 @@ const OutputWaveform: React.FC = () => {
               formatter={(value: any) => (typeof value === 'number' ? value.toFixed(3) : value) + ' V'}
             />
             <Legend verticalAlign="top" height={36}/>
-            {Object.keys(simulationResult.voltages).map((node, index) => (
+            {visibleNodes.map((node) => (
               <Line 
                 key={node}
                 type="monotone" 
                 dataKey={node} 
-                stroke={index === 0 ? "#60a5fa" : "#f472b6"} 
+                stroke={node === 'In' ? "#60a5fa" : node === 'Out' ? "#f472b6" : "#fbbf24"} 
                 strokeWidth={2} 
                 dot={false}
-                name={`Node ${node}`}
+                name={node === 'In' ? 'Input' : node === 'Out' ? 'Output' : `Selected Component`}
               />
             ))}
           </LineChart>

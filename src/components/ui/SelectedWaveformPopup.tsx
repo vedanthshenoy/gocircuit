@@ -9,13 +9,15 @@ const SelectedWaveformPopup: React.FC = () => {
   const data = useMemo(() => {
     if (!simulationResult || !selectedId) return [];
     
-    // For now, mock specific data for selected ID or reuse 'out' if available
-    // In a real app, simulationResult would have data for each component/node ID
-    const voltages = simulationResult.voltages['out'] || []; 
+    // Use data for the selected ID if available
+    const voltages = simulationResult.voltages[selectedId] || 
+                     simulationResult.voltages['Out'] || 
+                     simulationResult.voltages['out'] || 
+                     []; 
     
     return simulationResult.time.map((t, i) => ({
       time: t,
-      voltage: voltages[i] || 0 // Fallback
+      voltage: voltages[i] || 0
     }));
   }, [simulationResult, selectedId]);
 

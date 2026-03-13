@@ -189,11 +189,17 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
     
     let vout = [...vin];
     let simulated = false;
+    const componentVoltages: Record<string, number[]> = {};
 
     // Helper: are these two connected?
     const isConnected = (id1: string, id2: string) => edges.some(e => 
       (e.source === id1 && e.target === id2) || (e.source === id2 && e.target === id1)
     );
+
+    // Initialize all components with 0 voltage
+    Object.keys(components).forEach(id => {
+      componentVoltages[id] = new Array(time.length).fill(0);
+    });
 
     // 1. Check for Filtered Rectifier (Resistor <-> Diode <-> Capacitor)
     for (const r of resistors) {
@@ -216,6 +222,12 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
               }
               vout[i] = currentVout;
             }
+            
+            // Assign voltages
+            componentVoltages[r.id] = vin.map((v, i) => v - rectified[i]);
+            componentVoltages[d.id] = vin.map((v) => Math.min(v, 0.7)); // Simplified
+            componentVoltages[c.id] = [...vout];
+            
             simulated = true;
             break;
           }
@@ -238,6 +250,11 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
               currentVout += dv * dt;
               vout[i] = currentVout;
             }
+            
+            // Assign voltages
+            componentVoltages[r.id] = vin.map((v, i) => v - vout[i]);
+            componentVoltages[c.id] = [...vout];
+            
             simulated = true;
             break;
           }
@@ -252,6 +269,11 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
         for (const d of diodes) {
           if (isConnected(r.id, d.id)) {
             vout = vin.map(v => Math.max(0, v - 0.7));
+            
+            // Assign voltages
+            componentVoltages[d.id] = vin.map(v => Math.min(v, 0.7));
+            componentVoltages[r.id] = [...vout];
+            
             simulated = true;
             break;
           }
@@ -259,12 +281,20 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (simulated) break;
       }
     }
+
+    // Default for VoltageSource
+    Object.values(components).forEach(c => {
+      if (c.type === 'VoltageSource') {
+        componentVoltages[c.id] = [...vin];
+      }
+    });
     
     setSimulationResult({
       time,
       voltages: { 
         'In': vin,
-        'Out': vout // Always include Out for feedback
+        'Out': vout,
+        ...componentVoltages
       },
       currents: {}
     });
