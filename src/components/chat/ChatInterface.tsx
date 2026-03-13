@@ -10,13 +10,19 @@ const ChatInterface: React.FC = () => {
   const [isMinimized, setIsMinimized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isOpen]);
+    if (isOpen && !isMinimized) {
+      // Use a small timeout to ensure the DOM has finished rendering
+      const timer = setTimeout(() => {
+        scrollToBottom('auto'); // Use 'auto' for immediate scroll when opening
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [messages, isOpen, isMinimized]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
