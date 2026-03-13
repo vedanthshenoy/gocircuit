@@ -40,12 +40,37 @@ describe('CircuitValidator', () => {
     expect(result.isValid).toBe(false);
   });
 
-  it('should flag a source as shorted if pins a and b are connected together', () => {
-    const edges: Edge[] = [
-      { id: 'e1', source: 'v1', sourceHandle: 'a', target: 'v1', targetHandle: 'b' },
+  it('should flag open ends (unconnected pins)', () => {
+    const incompleteEdges: Edge[] = [
+      { id: 'e1', source: 'v1', sourceHandle: 'a', target: 'r1', targetHandle: 'a' },
+      { id: 'e2', source: 'r1', sourceHandle: 'b', target: 'g1', targetHandle: 'a' },
+      // v1 pin 'b' is NOT connected
     ];
 
-    const result = validateCircuit(nodes, edges, baseComponents);
-    expect(result.errors).toContain("Short circuit detected: Voltage Source V1 (ID: v1) pins 'a' and 'b' are connected together.");
+    const result = validateCircuit(nodes, incompleteEdges, baseComponents);
+    expect(result.errors).toContain("VoltageSource V1 (ID: v1) pin 'b' is not connected. All circuits must be closed.");
+    expect(result.isValid).toBe(false);
+  });
+
+  it('should flag overlapping components as messy', () => {
+    const overlappingComponents: Record<string, CircuitComponent> = {
+      'r1': { id: 'r1', type: 'Resistor', label: 'R1', value: 1000, unit: 'Ω', position: { x: 0, y: 0 }, rotation: 0 },
+      'r2': { id: 'r2', type: 'Resistor', label: 'R2', value: 1000, unit: 'Ω', position: { x: 20, y: 20 }, rotation: 0 },
+      'g1': { id: 'g1', type: 'Ground', label: 'GND', value: 0, unit: '', position: { x: 200, y: 200 }, rotation: 0 },
+    };
+
+    const result = validateCircuit([], [], overlappingComponents);
+    expect(result.errors).toContain("Components R1 and R2 are too close or overlapping. Increase spacing for a neat circuit.");
+    expect(result.isValid).toBe(false);
+  });
+
+  it('should warn about grid misalignment', () => {
+    const misalignedComponents: Record<string, CircuitComponent> = {
+      'r1': { id: 'r1', type: 'Resistor', label: 'R1', value: 1000, unit: 'Ω', position: { x: 15, y: 0 }, rotation: 0 },
+      'g1': { id: 'g1', type: 'Ground', label: 'GND', value: 0, unit: '', position: { x: 200, y: 200 }, rotation: 0 },
+    };
+
+    const result = validateCircuit([], [], misalignedComponents);
+    expect(result.warnings).toContain("Component R1 is not aligned to the 20px grid.");
   });
 });

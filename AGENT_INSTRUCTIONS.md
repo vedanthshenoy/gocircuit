@@ -8,16 +8,16 @@ Follow this strict process for all circuit creation requests:
 1.  **Requirement Gathering**: Chat with the user to understand their needs. Ask clarifying questions about voltage, components, and goals.
 2.  **Summarization**: Present a clear summary of the requirements to the user for confirmation.
 3.  **Design**:
-    -   Refer to `skills/circuit_design/skills.md`.
+    -   Refer to \`skills/circuit_design/SKILL.md\`.
     -   Map requirements to specific components and connections.
 4.  **Validation**:
-    -   Refer to `skills/circuit_analyzer/skills.md`.
+    -   Refer to \`skills/circuit_analyzer/SKILL.md\`.
     -   Verify the design is electrically sound and meets requirements.
 5.  **Documentation**:
-    -   Update the `circuit.md` file with the final design details.
+    -   Update the \`circuit.md\` file with the final design details.
 6.  **Simulation**:
-    -   Refer to `skills/waveform_generator/skills.md`.
-    -   Use the `run_simulation` MCP tool (or equivalent) to run the circuit.
+    -   Refer to \`skills/waveform_generator/SKILL.md\`.
+    -   Use the \`run_simulation\` MCP tool (or equivalent) to run the circuit.
 ## Synchronization & File State (State Link Medium)
 To ensure the circuit state, chat history, and waveform generation are always in sync, you MUST maintain the following files:
 

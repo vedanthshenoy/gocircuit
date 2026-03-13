@@ -10,62 +10,58 @@ const ComponentNode = memo(({ data, selected }: NodeProps<CircuitComponent>) => 
     transform: `rotate(${rotation * 90}deg)`,
   };
   
-  // Adjust handle positions based on rotation
-  // 0: Left-Right
-  // 1: Top-Bottom
-  // 2: Right-Left
-  // 3: Bottom-Top
-  
-  // Actually, if we rotate the whole container, handles rotate too.
-  // But we need to keep label upright?
-  // Let's just rotate the graphic and handles container.
+  const isVerticalDefault = type === 'VoltageSource' || type === 'Ground';
 
   const getHandlePosition = (basePosition: Position) => {
-    const r = ((rotation % 4) + 4) % 4; // Ensure positive 0-3
-    if (r === 0) return basePosition;
+    const r = ((rotation % 4) + 4) % 4;
     
-    // Mapping for rotation (clockwise)
-    // 0: L->L, R->R
-    // 1: L->T, R->B
-    // 2: L->R, R->L
-    // 3: L->B, R->T
+    let currentPosition = basePosition;
+    if (isVerticalDefault) {
+      if (basePosition === Position.Left) currentPosition = Position.Top;
+      if (basePosition === Position.Right) currentPosition = Position.Bottom;
+    }
+
+    if (r === 0) return currentPosition;
     
-    if (basePosition === Position.Left) {
-      return [Position.Left, Position.Top, Position.Right, Position.Bottom][r];
-    }
-    if (basePosition === Position.Right) {
-      return [Position.Right, Position.Bottom, Position.Left, Position.Top][r];
-    }
-    return basePosition;
+    const positions = [Position.Top, Position.Right, Position.Bottom, Position.Left];
+    const currentIndex = positions.indexOf(currentPosition);
+    return positions[(currentIndex + r) % 4];
   };
 
   return (
     <div 
       className={clsx(
-        "relative flex flex-col items-center justify-center p-2 rounded transition-all",
+        "relative flex flex-col items-center justify-center rounded transition-all",
         selected ? "ring-2 ring-blue-500 bg-blue-500/10" : "hover:bg-slate-800/50"
       )}
     >
-      <div style={rotateStyle} className="relative w-12 h-12 flex items-center justify-center">
-        {/* Component Graphic */}
-        <div className="text-slate-200">
+      {/* Container for Graphic and Handles - Graphic rotates, Handles move logically */}
+      <div className="relative w-10 h-10 flex items-center justify-center">
+        {/* Component Graphic - Only rotate the visual representation */}
+        <div style={rotateStyle} className="text-slate-200">
            {getComponentGraphic(type)}
         </div>
 
-        {/* Handles */}
+        {/* Handles - Positioned logically on the node edges */}
         <Handle
           type="target"
           position={getHandlePosition(Position.Left)}
           id="a"
-          className="!w-3 !h-3 !bg-slate-400 !border-2 !border-slate-800 hover:!bg-blue-400"
+          className="!w-2 !h-2 !bg-blue-400 !border-none !rounded-full opacity-0 group-hover:opacity-100 hover:!opacity-100"
+          style={{ visibility: 'visible' }} // Ensure they are active but small
         />
-        <Handle
-          type="source"
-          position={getHandlePosition(Position.Right)}
-          id="b"
-          className="!w-3 !h-3 !bg-slate-400 !border-2 !border-slate-800 hover:!bg-blue-400"
-        />
+        {type !== 'Ground' && (
+          <Handle
+            type="source"
+            position={getHandlePosition(Position.Right)}
+            id="b"
+            className="!w-2 !h-2 !bg-blue-400 !border-none !rounded-full opacity-0 group-hover:opacity-100 hover:!opacity-100"
+            style={{ visibility: 'visible' }}
+          />
+        )}
       </div>
+
+      {/* Label (always upright, positioned outside the box) */}
 
       {/* Label (always upright-ish or below) */}
       <div className="absolute -bottom-6 w-32 text-center pointer-events-none">

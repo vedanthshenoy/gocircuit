@@ -144,9 +144,21 @@ export const useChat = () => {
           Current circuit state: ${currentCircuitContext}.
           
           WIRING GUIDELINES:
-          - Use a grid-based layout. X increments by 200px, Y is constant for series components.
+          - Ensure the circuit is ALWAYS CLOSED with NO OPEN ENDS. Every pin of every component must be connected to something.
+          - MANDATORY: Every single component must have a valid electrical path to Ground. No isolated "islands" are allowed.
+          - Strictly generate a NEAT circuit:
+            - Align components to a 20px grid (X and Y must be multiples of 20).
+            - Maintain a minimum spacing of 200px between components to avoid crowding.
+            - Ensure wires (paths between components) do not pass THROUGH other components.
+            - Use a grid-based layout. X increments by 200px, Y is constant for series components.
           - Rail layout: Positive rail at Y=100, Negative/Ground rail at Y=400.
-          - Component spacing: 200px between nodes.
+          - WIRING PATTERNS:
+            - SERIES: Connect Source(b) to Target(a). Example: [V1(a)->R1(a), R1(b)->R2(a), R2(b)->GND(a)].
+            - PARALLEL: Connect BOTH components to the same two nodes. Example: [R1(a)->R2(a), R1(b)->R2(b)].
+          - ROTATION RULES:
+            - Components in horizontal paths (series): rotation 0 (for R, C, L, D).
+            - Components in vertical paths (shunt to ground): rotation 1 or 3 (for R, C, L, D).
+            - VoltageSource and Ground are VERTICAL by default at rotation 0.
           - Use handle 'a' for Input/Positive and 'b' for Output/Negative.
           - For Ground, use handle 'a'.
 
@@ -267,7 +279,7 @@ export const useChat = () => {
                 sourceHandle: c.sourceHandle,
                 target: c.target,
                 targetHandle: c.targetHandle,
-                type: 'step'
+                // Removed type: 'step' to use defaultEdgeOptions from CircuitCanvas
             })));
             setInputWaveform(design.inputWaveform);
             

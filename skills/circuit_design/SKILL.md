@@ -20,6 +20,8 @@ This skill is responsible for translating a textual requirement into a structure
 ## Design Principles
 -   **Signal Flow**: Left-to-right (Input to Output).
 -   **Power Rails**: Positive on top, Negative/Ground on bottom.
+-   **Closed Circuits**: Every component must be part of a complete electrical path (no open ends). All pins must be connected.
+-   **Neatness**: Align components to a 20px grid, maintain 200px spacing, and minimize overlapping wires/components.
 -   **Feedback Loops**: Minimize trace length for stability.
 
 ## References

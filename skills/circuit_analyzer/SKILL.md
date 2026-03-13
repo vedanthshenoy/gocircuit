@@ -16,10 +16,14 @@ This skill validates a proposed circuit design against the original requirements
     -   Does the cutoff frequency $f_c$ match requirements within ±10%?
     -   Is the DC gain correct?
 3.  **Correctness Rules**:
-    -   Check for floating nodes (unconnected pins).
+    -   Check for floating nodes (unconnected pins). **All circuits must be CLOSED.**
     -   Ensure at least one **Ground** exists.
     -   Detect short circuits (e.g., source to ground direct connection).
-4.  **Component Limits**:
+4.  **Neatness Checks**:
+    -   Verify 20px grid alignment for all components.
+    -   Ensure minimum 200px spacing between components.
+    -   Identify overlapping components or messy wiring.
+5.  **Component Limits**:
     -   Ensure component values are not 0.
     -   Verify realistic power/voltage limits for simulated components.
 
