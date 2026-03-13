@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "CircuitPlayground": {
+      "command": "node",
+      "args": [
+        "C:/Users/buzzv/gocircuit/mcp-server/dist/index.js"
+      ],
+      "trust": true
+    }
+  }
+}
