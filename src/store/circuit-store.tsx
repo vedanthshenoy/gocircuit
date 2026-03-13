@@ -188,49 +188,75 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
     const diodes = Object.values(components).filter(c => c.type === 'Diode');
     
     let vout = [...vin];
-    let hasFilter = false;
-    let hasRectifier = false;
+    let simulated = false;
 
-    // Check for RC Filter
+    // Helper: are these two connected?
+    const isConnected = (id1: string, id2: string) => edges.some(e => 
+      (e.source === id1 && e.target === id2) || (e.source === id2 && e.target === id1)
+    );
+
+    // 1. Check for Filtered Rectifier (Resistor <-> Diode <-> Capacitor)
     for (const r of resistors) {
-      for (const c of capacitors) {
-        const connection = edges.find(e => 
-          (e.source === r.id && e.target === c.id) ||
-          (e.source === c.id && e.target === r.id)
-        );
-        if (connection) {
-          hasFilter = true;
-          const R = r.value || 1000;
-          const C = c.value || 1e-6;
-          const tau = R * C;
-          vout = new Array(time.length).fill(0);
-          let currentVout = 0;
-          for (let i = 0; i < time.length; i++) {
-            const dv = (vin[i] - currentVout) / tau;
-            currentVout += dv * dt;
-            vout[i] = currentVout;
-          }
-          break;
-        }
-      }
-      if (hasFilter) break;
-    }
-
-    // Check for Rectifier if no filter found
-    if (!hasFilter) {
-      for (const r of resistors) {
-        for (const d of diodes) {
-          const connection = edges.find(e => 
-            (e.source === d.id && e.target === r.id) ||
-            (e.source === r.id && e.target === d.id)
-          );
-          if (connection) {
-            hasRectifier = true;
-            vout = vin.map(v => Math.max(0, v - 0.7));
+      for (const d of diodes) {
+        for (const c of capacitors) {
+          if (isConnected(r.id, d.id) && isConnected(d.id, c.id)) {
+            const tau = (r.value || 1000) * (c.value || 1e-6);
+            const rectified = vin.map(v => Math.max(0, v - 0.7));
+            vout = new Array(time.length).fill(0);
+            let currentVout = 0;
+            for (let i = 0; i < time.length; i++) {
+              if (rectified[i] > currentVout) {
+                // Charge through R
+                const dv = (rectified[i] - currentVout) / tau;
+                currentVout += dv * dt;
+              } else {
+                // Discharge (assume R_load approx 5*R_series)
+                const dv = -currentVout / (tau * 5);
+                currentVout += dv * dt;
+              }
+              vout[i] = currentVout;
+            }
+            simulated = true;
             break;
           }
         }
-        if (hasRectifier) break;
+        if (simulated) break;
+      }
+      if (simulated) break;
+    }
+
+    // 2. Check for RC Filter (if not already simulated)
+    if (!simulated) {
+      for (const r of resistors) {
+        for (const c of capacitors) {
+          if (isConnected(r.id, c.id)) {
+            const tau = (r.value || 1000) * (c.value || 1e-6);
+            vout = new Array(time.length).fill(0);
+            let currentVout = 0;
+            for (let i = 0; i < time.length; i++) {
+              const dv = (vin[i] - currentVout) / tau;
+              currentVout += dv * dt;
+              vout[i] = currentVout;
+            }
+            simulated = true;
+            break;
+          }
+        }
+        if (simulated) break;
+      }
+    }
+
+    // 3. Check for Rectifier (if not already simulated)
+    if (!simulated) {
+      for (const r of resistors) {
+        for (const d of diodes) {
+          if (isConnected(r.id, d.id)) {
+            vout = vin.map(v => Math.max(0, v - 0.7));
+            simulated = true;
+            break;
+          }
+        }
+        if (simulated) break;
       }
     }
     

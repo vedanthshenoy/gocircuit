@@ -51,12 +51,15 @@ describe('useChat hook', () => {
     const mockDesign1 = {
       components: [
         { id: "v1", type: "VoltageSource", label: "V1", value: 10, position: { x: 0, y: 0 }, rotation: 0 },
-        { id: "r1", type: "Resistor", label: "R1", value: 1000, position: { x: 100, y: 0 }, rotation: 0 },
-        { id: "c1", type: "Capacitor", label: "C1", value: 0.000001, position: { x: 200, y: 0 }, rotation: 0 },
-        { id: "g1", type: "Ground", label: "G1", value: 0, position: { x: 100, y: 100 }, rotation: 0 }
+        { id: "r1", type: "Resistor", label: "R1", value: 1000, position: { x: 200, y: 0 }, rotation: 0 },
+        { id: "c1", type: "Capacitor", label: "C1", value: 0.000001, position: { x: 400, y: 0 }, rotation: 0 },
+        { id: "g1", type: "Ground", label: "G1", value: 0, position: { x: 200, y: 200 }, rotation: 0 }
       ],
       connections: [
-        { source: "r1", sourceHandle: "b", target: "c1", targetHandle: "a" } // Connection needed for filter
+        { source: "v1", sourceHandle: "a", target: "r1", targetHandle: "a" },
+        { source: "r1", sourceHandle: "b", target: "c1", targetHandle: "a" },
+        { source: "c1", sourceHandle: "b", target: "g1", targetHandle: "a" },
+        { source: "v1", sourceHandle: "b", target: "g1", targetHandle: "a" }
       ],
       inputWaveform: { type: "Sine", amplitude: 10, frequency: 1000, offset: 0, phase: 0 },
       explanation: "RC low-pass filter."
@@ -68,6 +71,7 @@ describe('useChat hook', () => {
     mockSendMessage.mockResolvedValueOnce({ response: { text: () => "RC Filter. OK?" } });
     await act(async () => { await result.current.chat.sendMessage("Yes"); });
     mockSendMessage.mockResolvedValueOnce({ response: { text: () => JSON.stringify(mockDesign1) } });
+    mockSendMessage.mockResolvedValueOnce({ response: { text: () => "Looks good. VERIFICATION_SUCCESSFUL" } }); // Verification Mock
     await act(async () => { await result.current.chat.sendMessage("Yes"); });
     await act(async () => { vi.runAllTimers(); });
 
@@ -87,14 +91,18 @@ describe('useChat hook', () => {
         { ...mockDesign1.components[2] },
         { ...mockDesign1.components[3] }
       ],
+      connections: [...mockDesign1.connections],
+      inputWaveform: { ...mockDesign1.inputWaveform },
       explanation: "Increased resistance to 10k."
     };
+
 
     mockSendMessage.mockResolvedValueOnce({ response: { text: () => "Change R?" } });
     await act(async () => { await result.current.chat.sendMessage("Change R1 to 10k"); });
     mockSendMessage.mockResolvedValueOnce({ response: { text: () => "OK?" } });
     await act(async () => { await result.current.chat.sendMessage("Yes"); });
     mockSendMessage.mockResolvedValueOnce({ response: { text: () => JSON.stringify(mockDesign2) } });
+    mockSendMessage.mockResolvedValueOnce({ response: { text: () => "Updated R is correct. VERIFICATION_SUCCESSFUL" } }); // Verification Mock
     await act(async () => { await result.current.chat.sendMessage("Yes"); });
     await act(async () => { vi.runAllTimers(); });
 
@@ -105,5 +113,6 @@ describe('useChat hook', () => {
 
     console.log(`Max Vout 1 (1k): ${maxVout1}, Max Vout 2 (10k): ${maxVout2}`);
     expect(maxVout2).toBeLessThan(maxVout1);
+
   });
 });

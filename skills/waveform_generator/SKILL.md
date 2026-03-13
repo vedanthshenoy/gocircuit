@@ -9,12 +9,13 @@ description: Handles the simulation of electronic circuits and the generation/an
 This skill manages the simulation of the designed circuit and the generation/visualization of input and output waveforms. It acts as a specialized **Waveform Generator Subagent**.
 
 ## Subagent Role: Waveform Generator
-**Objective**: Given a `circuit.md` and a user query, generate a mathematically and subject-wise accurate output waveform.
+**Objective**: Given the circuit state in `waveform_scratchpad.txt` and `circuit.md`, and a user query, generate a mathematically and subject-wise accurate output waveform.
 
 **Workflow**:
-1.  **Input Analysis**:
-    *   Read `circuit.md` to identify components, their values, and connections.
-    *   Extract input waveform parameters (e.g., $V_{in}(t) = A \sin(2\pi f t + \phi)$) from `circuit.md`.
+1.  **State Synchronization**:
+    *   **Always read `waveform_scratchpad.txt` first** to identify the latest changes and current circuit state.
+    *   Verify consistency with `circuit.md`.
+    *   Extract components, their values, connections, and input waveform parameters from both sources.
 2.  **Mathematical Modeling**:
     *   Derive the circuit's transfer function $H(s)$ or differential equations.
     *   Identify the type of circuit (e.g., Low-pass filter, High-pass filter, Rectifier, etc.).

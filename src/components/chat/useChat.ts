@@ -46,6 +46,9 @@ export const useChat = () => {
       const model = genAI.getGenerativeModel({ model: PRIMARY_MODEL });
       const chat = model.startChat({ history });
       const result = await chat.sendMessage(prompt);
+      if (!result || !result.response) {
+        throw new Error("Empty response from model");
+      }
       return result.response.text();
     } catch (error) {
       console.warn(`Primary model (${PRIMARY_MODEL}) failed, trying fallback (${FALLBACK_MODEL})...`, error);
@@ -53,6 +56,9 @@ export const useChat = () => {
         const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
         const chat = model.startChat({ history });
         const result = await chat.sendMessage(prompt);
+        if (!result || !result.response) {
+          throw new Error("Empty response from fallback model");
+        }
         return result.response.text();
       } catch (fallbackError) {
         console.error(`Fallback model (${FALLBACK_MODEL}) also failed:`, fallbackError);
@@ -74,6 +80,19 @@ export const useChat = () => {
         },
       ],
     }));
+  };
+
+  const extractJson = (text: string) => {
+    // Try to find a JSON block first
+    const match = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/{[\s\S]*}/);
+    if (!match) return null;
+    const jsonStr = match[0].includes('```json') ? match[1] : match[0];
+    try {
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      console.error("Failed to parse extracted JSON", e, jsonStr);
+      return null;
+    }
   };
 
   const processUserMessage = useCallback(async (content: string) => {
@@ -159,10 +178,13 @@ export const useChat = () => {
       }
 
       const response = await generateWithFallback(prompt, history);
+      
       if (nextStep === 'design') {
         try {
-          const jsonStr = response.replace(/```json\n?|\n?```/g, '').trim();
-          const design = JSON.parse(jsonStr);
+          const design = extractJson(response);
+          if (!design) {
+            throw new Error("Could not find valid JSON in the model response.");
+          }
           
           addMessage('assistant', `Design complete: ${design.explanation}\n\nValidating circuit topology...`);
           
@@ -190,8 +212,11 @@ export const useChat = () => {
             Please fix the design and return the corrected JSON. 
             Requirement: ${state.requirementText}`;
             const fixResponse = await generateWithFallback(fixPrompt, history);
-            const fixedJsonStr = fixResponse.replace(/```json\n?|\n?```/g, '').trim();
-            const fixedDesign = JSON.parse(fixedJsonStr);
+            const fixedDesign = extractJson(fixResponse);
+            
+            if (!fixedDesign) {
+                throw new Error("Could not find valid JSON in the fix response.");
+            }
             
             // Re-validate fixed design
             const fixedComponents: Record<string, any> = {};
@@ -252,12 +277,15 @@ export const useChat = () => {
              addMessage('assistant', "The simulation check failed. I'll need to rethink the design.");
           }
 
-          setState(prev => ({ ...prev, isTyping: false, step: 'idle', requirementText: '' }));
+          // Reset to idle after design is processed
+          nextStep = 'idle';
+          nextReqText = '';
 
-        } catch (e) {
-          console.error("Failed to parse design JSON", e, response);
-          addMessage('assistant', "I encountered an error while designing the circuit. Let's try again. " + response);
-          setState(prev => ({ ...prev, isTyping: false, step: 'idle', requirementText: '' }));
+        } catch (e: any) {
+          console.error("Circuit Design Error", e);
+          addMessage('assistant', `I encountered an error while designing the circuit: ${e.message}. Let's try to refine the requirements.`);
+          nextStep = 'idle';
+          nextReqText = '';
         }
       } else {
         addMessage('assistant', response);
@@ -269,6 +297,7 @@ export const useChat = () => {
         step: nextStep,
         requirementText: nextReqText,
       }));
+
 
     } catch (error: any) {
       console.error("Gemini API Error:", error);

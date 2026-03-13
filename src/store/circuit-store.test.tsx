@@ -222,4 +222,50 @@ describe('CircuitStore', () => {
 
     expect(result.current.edges.length).toBe(1); // Still 1
   });
+
+  it('should simulate a half-wave rectifier with smoothing capacitor', () => {
+    const { result } = renderHook(() => useCircuit(), { wrapper });
+
+    act(() => {
+      result.current.addComponent('Resistor', { x: 0, y: 0 });
+      result.current.addComponent('Diode', { x: 100, y: 100 });
+      result.current.addComponent('Capacitor', { x: 200, y: 200 });
+    });
+
+    const ids = Object.values(result.current.components);
+    const rId = ids.find(c => c.type === 'Resistor')!.id;
+    const dId = ids.find(c => c.type === 'Diode')!.id;
+    const cId = ids.find(c => c.type === 'Capacitor')!.id;
+
+    act(() => {
+      // R=10, C=1000uF => tau = 10ms
+      result.current.updateComponent(rId, { value: 10 });
+      result.current.updateComponent(cId, { value: 0.001 });
+
+      // Connect R -> D
+      result.current.onConnect({ source: rId, target: dId, sourceHandle: 'right', targetHandle: 'anode' });
+      // Connect D -> C
+      result.current.onConnect({ source: dId, target: cId, sourceHandle: 'cathode', targetHandle: 'top' });
+
+      result.current.setInputWaveform({
+        type: 'Sine',
+        amplitude: 10,
+        frequency: 50,
+        offset: 0,
+        phase: 0
+      });
+    });
+
+    act(() => {
+      result.current.runSimulation();
+    });
+
+    const res = result.current.simulationResult!;
+    const maxVout = Math.max(...res.voltages['Out']);
+    const lastVout = res.voltages['Out'][res.voltages['Out'].length - 1];
+
+    // verify that the output is rectified and smoothed
+    expect(maxVout).toBeGreaterThan(5); 
+    expect(lastVout).toBeGreaterThan(3); 
+  });
 });
