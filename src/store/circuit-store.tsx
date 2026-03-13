@@ -1,0 +1,271 @@
+import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { 
+  type Node, 
+  type Edge, 
+  type OnNodesChange, 
+  type OnEdgesChange, 
+  type OnConnect, 
+  applyNodeChanges, 
+  applyEdgeChanges, 
+  addEdge,
+  type Connection,
+  type EdgeChange,
+  type NodeChange
+} from 'reactflow';
+import { type CircuitComponent, type SimulationResult, type InputWaveform } from '../types/circuit';
+
+interface CircuitContextType {
+  nodes: Node[];
+  edges: Edge[];
+  onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
+  onConnect: OnConnect;
+  components: Record<string, CircuitComponent>;
+  addComponent: (type: CircuitComponent['type'], position: { x: number, y: number }) => void;
+  updateComponent: (id: string, updates: Partial<CircuitComponent>) => void;
+  removeComponent: (id: string) => void;
+  selectedId: string | null;
+  setSelectedId: (id: string | null) => void;
+  simulationResult: SimulationResult | null;
+  runSimulation: () => void;
+  inputWaveform: InputWaveform;
+  setInputWaveform: (wave: InputWaveform) => void;
+  setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
+  setComponents: React.Dispatch<React.SetStateAction<Record<string, CircuitComponent>>>;
+}
+
+const CircuitContext = createContext<CircuitContextType | undefined>(undefined);
+
+export const useCircuit = () => {
+  const context = useContext(CircuitContext);
+  if (!context) {
+    throw new Error('useCircuit must be used within a CircuitProvider');
+  }
+  return context;
+};
+
+export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
+  const [components, setComponents] = useState<Record<string, CircuitComponent>>({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
+  const [inputWaveform, setInputWaveform] = useState<InputWaveform>({
+    type: 'Sine',
+    amplitude: 50,
+    frequency: 50,
+    offset: 0,
+    phase: 0
+  });
+
+  const onNodesChange: OnNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      setNodes((nds) => applyNodeChanges(changes, nds));
+      
+      // Sync components state if nodes are removed
+      changes.forEach(change => {
+        if (change.type === 'remove') {
+          setComponents(prev => {
+            const next = { ...prev };
+            delete next[change.id];
+            return next;
+          });
+          if (selectedId === change.id) setSelectedId(null);
+        }
+      });
+    },
+    [selectedId]
+  );
+
+  const onEdgesChange: OnEdgesChange = useCallback(
+    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    []
+  );
+
+  const onConnect: OnConnect = useCallback(
+    (params: Connection) => {
+      if (params.source === params.target) return;
+      
+      setEdges((eds) => {
+        // Prevent duplicate connections between same handles
+        const exists = eds.find(e => 
+          e.source === params.source && 
+          e.target === params.target && 
+          e.sourceHandle === params.sourceHandle && 
+          e.targetHandle === params.targetHandle
+        );
+        if (exists) return eds;
+        return addEdge(params, eds);
+      });
+    },
+    []
+  );
+
+  const addComponent = useCallback((type: CircuitComponent['type'], position: { x: number, y: number }) => {
+    const id = crypto.randomUUID();
+    const newComponent: CircuitComponent = {
+      id,
+      type,
+      label: type,
+      value: type === 'Resistor' ? 1000 : type === 'Capacitor' ? 1e-6 : type === 'Inductor' ? 1e-3 : 0,
+      unit: type === 'Resistor' ? 'Ω' : type === 'Capacitor' ? 'F' : type === 'Inductor' ? 'H' : 'V',
+      rotation: 0,
+      position
+    };
+
+    setComponents(prev => ({ ...prev, [id]: newComponent }));
+    
+    setNodes(prev => [
+      ...prev,
+      {
+        id,
+        type: 'circuitComponent', // Custom node type
+        position,
+        data: { ...newComponent },
+      }
+    ]);
+  }, []);
+
+  const updateComponent = useCallback((id: string, updates: Partial<CircuitComponent>) => {
+    setComponents(prev => {
+      const updated = { ...prev[id], ...updates };
+      return { ...prev, [id]: updated };
+    });
+    
+    setNodes(prev => prev.map(node => {
+      if (node.id === id) {
+        return { ...node, data: { ...node.data, ...updates } };
+      }
+      return node;
+    }));
+  }, []);
+
+  const removeComponent = useCallback((id: string) => {
+    setComponents(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setNodes(prev => prev.filter(n => n.id !== id));
+    setEdges(prev => prev.filter(e => e.id !== id && e.source !== id && e.target !== id));
+    if (selectedId === id) setSelectedId(null);
+  }, [selectedId]);
+
+  const runSimulation = useCallback(() => {
+    console.log('Running simulation...');
+    
+    const dt = 0.00001; // 10us steps
+    const steps = 5000; // 50ms total
+    const time = Array.from({ length: steps }, (_, i) => i * dt);
+    
+    // Default input voltage
+    const vin = time.map(t => {
+      const phase = (inputWaveform.phase * Math.PI) / 180;
+      const omega = 2 * Math.PI * inputWaveform.frequency;
+      let val = 0;
+      
+      switch (inputWaveform.type) {
+        case 'Sine':
+          val = inputWaveform.amplitude * Math.sin(omega * t + phase);
+          break;
+        case 'Square':
+          val = Math.sin(omega * t + phase) >= 0 ? inputWaveform.amplitude : -inputWaveform.amplitude;
+          break;
+        case 'Triangle':
+          val = (2 * inputWaveform.amplitude / Math.PI) * Math.asin(Math.sin(omega * t + phase));
+          break;
+        case 'DC':
+          val = inputWaveform.amplitude;
+          break;
+      }
+      return val + inputWaveform.offset;
+    });
+
+    // Simple RC Filter or Rectifier Detection
+    const resistors = Object.values(components).filter(c => c.type === 'Resistor');
+    const capacitors = Object.values(components).filter(c => c.type === 'Capacitor');
+    const diodes = Object.values(components).filter(c => c.type === 'Diode');
+    
+    let vout = [...vin];
+    let hasFilter = false;
+    let hasRectifier = false;
+
+    // Check for RC Filter
+    for (const r of resistors) {
+      for (const c of capacitors) {
+        const connection = edges.find(e => 
+          (e.source === r.id && e.target === c.id) ||
+          (e.source === c.id && e.target === r.id)
+        );
+        if (connection) {
+          hasFilter = true;
+          const R = r.value || 1000;
+          const C = c.value || 1e-6;
+          const tau = R * C;
+          vout = new Array(time.length).fill(0);
+          let currentVout = 0;
+          for (let i = 0; i < time.length; i++) {
+            const dv = (vin[i] - currentVout) / tau;
+            currentVout += dv * dt;
+            vout[i] = currentVout;
+          }
+          break;
+        }
+      }
+      if (hasFilter) break;
+    }
+
+    // Check for Rectifier if no filter found
+    if (!hasFilter) {
+      for (const r of resistors) {
+        for (const d of diodes) {
+          const connection = edges.find(e => 
+            (e.source === d.id && e.target === r.id) ||
+            (e.source === r.id && e.target === d.id)
+          );
+          if (connection) {
+            hasRectifier = true;
+            vout = vin.map(v => Math.max(0, v - 0.7));
+            break;
+          }
+        }
+        if (hasRectifier) break;
+      }
+    }
+    
+    setSimulationResult({
+      time,
+      voltages: { 
+        'In': vin,
+        'Out': vout // Always include Out for feedback
+      },
+      currents: {}
+    });
+  }, [inputWaveform, components, nodes, edges]);
+
+  return (
+    <CircuitContext.Provider value={{
+      nodes,
+      edges,
+      onNodesChange,
+      onEdgesChange,
+      onConnect,
+      components,
+      addComponent,
+      updateComponent,
+      removeComponent,
+      selectedId,
+      setSelectedId,
+      simulationResult,
+      runSimulation,
+      inputWaveform,
+      setInputWaveform,
+      setNodes,
+      setEdges,
+      setComponents
+    }}>
+      {children}
+    </CircuitContext.Provider>
+  );
+};
