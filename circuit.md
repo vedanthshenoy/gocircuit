@@ -1,22 +1,19 @@
-# Circuit Design: [Project Name]
+# Digital Logic Circuit Design
 
-## Components
-- None currently added.
+## Logic Components
+- Logic Gates: AND, OR, NAND, NOR, XOR, XNOR, NOT, Buffer
+- Standard: IEEE symbols
 
-## Connections
-- No connections established.
+## Input Configuration
+- Waveform Type: DC / Step Function
+- Step Size: 5V (Standard TTL)
+- Number of Steps: 1 (Default)
 
-## Input Waveform
-- Type: DC
-- Amplitude: 5V
-- Frequency: 0Hz
-- Offset: 0V
-- Phase: 0°
-
-## Design Rationale
-*(Describe the purpose and goal of this circuit design)*
+## Truth Table
+*(Truth table for the overall circuit will be generated here)*
 
 ## Performance Metrics
-- Cutoff Frequency ($f_c$): N/A
-- Gain: N/A
-- Efficiency: N/A
+- Propagation Delay ($t_{pd}$): N/A
+- Fan-out Capability: N/A
+- Power Dissipation: N/A
+- Noise Margin: N/A

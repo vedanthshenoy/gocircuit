@@ -8,23 +8,29 @@ export interface ValidationResult {
 }
 
 export function validateCircuit(
-  nodes: Node[],
+  _nodes: Node[],
   edges: Edge[],
   components: Record<string, CircuitComponent>
 ): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // 1. Check for Ground
+  // 1. Check for Ground (Optional if only logic gates)
   const hasGround = Object.values(components).some(c => c.type === 'Ground');
-  if (!hasGround) {
-    errors.push("Missing Ground reference. Every circuit needs at least one Ground node.");
+  const hasAnalog = Object.values(components).some(c => 
+    ['Resistor', 'Capacitor', 'Inductor', 'Diode', 'VoltageSource'].includes(c.type)
+  );
+  if (hasAnalog && !hasGround) {
+    errors.push("Missing Ground reference. Analog circuits need at least one Ground node.");
   }
 
   // 2. Check for Voltage Source
   const hasSource = Object.values(components).some(c => c.type === 'VoltageSource');
-  if (!hasSource) {
-    warnings.push("No Voltage Source detected. The circuit might be passive or powered by an external source.");
+  const hasLogic = Object.values(components).some(c => 
+    ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR', 'NOT', 'Buffer'].includes(c.type)
+  );
+  if (!hasSource && !hasLogic) {
+    warnings.push("No Power Source or Logic Gates detected. The circuit might be passive.");
   }
 
   // 3. Check for Floating Nodes / Dangling Pins
@@ -49,16 +55,18 @@ export function validateCircuit(
     
     if (comp.type === 'Ground') {
       if (connectedPins.size === 0) {
-        errors.push(`Ground node (${comp.label}) is not connected to anything.`);
+        errors.push(`Ground node (${comp.label}) is not connected.`);
       }
-    } else if (comp.type === 'VoltageSource' || comp.type === 'Resistor' || comp.type === 'Capacitor' || comp.type === 'Inductor' || comp.type === 'Diode') {
-      // These usually have two pins: 'a' and 'b'
-      if (!connectedPins.has('a')) {
-        errors.push(`${comp.type} ${comp.label} (ID: ${id}) pin 'a' is not connected.`);
-      }
-      if (!connectedPins.has('b')) {
-        errors.push(`${comp.type} ${comp.label} (ID: ${id}) pin 'b' is not connected.`);
-      }
+    } else if (['Resistor', 'Capacitor', 'Inductor', 'Diode', 'VoltageSource'].includes(comp.type)) {
+      if (!connectedPins.has('a')) errors.push(`${comp.type} ${comp.label} pin 'a' is not connected.`);
+      if (!connectedPins.has('b')) errors.push(`${comp.type} ${comp.label} pin 'b' is not connected.`);
+    } else if (['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR'].includes(comp.type)) {
+      if (!connectedPins.has('in1')) errors.push(`${comp.type} ${comp.label} input 'in1' is not connected.`);
+      if (!connectedPins.has('in2')) errors.push(`${comp.type} ${comp.label} input 'in2' is not connected.`);
+      if (!connectedPins.has('out')) warnings.push(`${comp.type} ${comp.label} output 'out' is floating.`);
+    } else if (['NOT', 'Buffer'].includes(comp.type)) {
+      if (!connectedPins.has('a')) errors.push(`${comp.type} ${comp.label} input 'a' is not connected.`);
+      if (!connectedPins.has('out')) warnings.push(`${comp.type} ${comp.label} output 'out' is floating.`);
     }
   });
 
@@ -77,7 +85,6 @@ export function validateCircuit(
       const otherId = isSourceV ? edge.target : isTargetV ? edge.source : null;
       const otherComp = otherId ? components[otherId] : null;
       const vHandle = isSourceV ? edge.sourceHandle : isTargetV ? edge.targetHandle : null;
-      const otherHandle = isSourceV ? edge.targetHandle : isTargetV ? edge.sourceHandle : null;
 
       if (isSourceV && isTargetV) {
         if ((edge.sourceHandle === 'a' && edge.targetHandle === 'b') || 

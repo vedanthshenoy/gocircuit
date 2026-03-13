@@ -56,17 +56,44 @@ const OutputWaveform: React.FC = () => {
             {Object.keys(simulationResult.voltages).map((node, index) => (
               <Line 
                 key={node}
-                type="monotone" 
+                type={simulationResult.truthTable ? "stepAfter" : "monotone"} 
                 dataKey={node} 
                 stroke={index === 0 ? "#60a5fa" : "#f472b6"} 
                 strokeWidth={2} 
                 dot={false}
-                name={`Node ${node}`}
+                name={node}
               />
             ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
+      {simulationResult.truthTable && (
+        <div className="mt-4 border-t border-slate-700 pt-4">
+          <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Truth Table</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[10px] text-slate-300 border-collapse">
+              <thead>
+                <tr>
+                  {simulationResult.truthTable.headers.map((h, i) => (
+                    <th key={i} className="border border-slate-700 p-1 bg-slate-800">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {simulationResult.truthTable.rows.map((row, i) => (
+                  <tr key={i} className="hover:bg-slate-800/50">
+                    {row.map((val, j) => (
+                      <td key={j} className={`border border-slate-700 p-1 font-mono ${val === 1 ? 'text-green-400' : 'text-red-400'}`}>
+                        {val}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -152,35 +152,210 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (selectedId === id) setSelectedId(null);
   }, [selectedId]);
 
+  const getWaveformValue = useCallback((t: number, totalTime: number) => {
+    const phase = (inputWaveform.phase * Math.PI) / 180;
+    const omega = 2 * Math.PI * inputWaveform.frequency;
+    let val = 0;
+    
+    switch (inputWaveform.type) {
+      case 'Sine':
+        val = inputWaveform.amplitude * Math.sin(omega * t + phase);
+        break;
+      case 'Square':
+        val = Math.sin(omega * t + phase) >= 0 ? inputWaveform.amplitude : -inputWaveform.amplitude;
+        break;
+      case 'Triangle':
+        val = (2 * inputWaveform.amplitude / Math.PI) * Math.asin(Math.sin(omega * t + phase));
+        break;
+      case 'DC':
+        val = inputWaveform.amplitude;
+        break;
+      case 'Step':
+        const numSteps = Math.max(1, inputWaveform.frequency);
+        const stepSize = inputWaveform.amplitude;
+        const stepDuration = totalTime / (numSteps + 1);
+        const currentStep = Math.floor(t / stepDuration);
+        val = Math.min(numSteps, currentStep) * stepSize;
+        break;
+    }
+    return val + inputWaveform.offset;
+  }, [inputWaveform]);
+
+  const simulateLogicCircuit = useCallback(() => {
+    const logicGates = Object.values(components).filter(c => 
+      ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR', 'NOT', 'Buffer'].includes(c.type)
+    );
+
+    // 1. Identify Inputs (gates or nodes with no incoming logic edges)
+    const hasInputEdge = new Set(edges.map(e => e.target));
+    const inputGateIds = Object.keys(components).filter(id => {
+      const comp = components[id];
+      const isLogic = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR', 'NOT', 'Buffer'].includes(comp.type);
+      return isLogic && !hasInputEdge.has(id);
+    });
+    
+    // 2. Identify Outputs (logic gates with no outgoing edges)
+    const hasOutputEdge = new Set(edges.map(e => e.source));
+    const outputGateIds = Object.keys(components).filter(id => {
+      const comp = components[id];
+      const isLogic = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR', 'NOT', 'Buffer'].includes(comp.type);
+      return isLogic && !hasOutputEdge.has(id);
+    });
+
+    if (inputGateIds.length === 0 && logicGates.length > 0) {
+      inputGateIds.push(logicGates[0].id);
+    }
+
+    const headers = [...inputGateIds.map(id => components[id].label), ...outputGateIds.map(id => components[id].label)];
+    const rows: (number | string)[][] = [];
+
+    // Truth Table Generation
+    const numInputs = inputGateIds.length;
+    const numCombinations = Math.pow(2, numInputs);
+    for (let i = 0; i < numCombinations; i++) {
+      const inputValues: Record<string, number> = {};
+      const row: number[] = [];
+      for (let j = 0; j < numInputs; j++) {
+        const val = (i >> (numInputs - 1 - j)) & 1;
+        inputValues[inputGateIds[j]] = val;
+        row.push(val);
+      }
+
+      const state = { ...inputValues };
+      let changed = true;
+      let iterations = 0;
+      while (changed && iterations < 100) {
+        changed = false;
+        iterations++;
+        for (const gate of logicGates) {
+          const inputs = edges
+            .filter(e => e.target === gate.id)
+            .map(e => state[e.source] ?? 0);
+          
+          let out = 0;
+          const a = inputs[0] ?? 0;
+          const b = inputs[1] ?? 0;
+
+          switch (gate.type) {
+            case 'AND': out = (a > 0.5 && b > 0.5) ? 1 : 0; break;
+            case 'OR': out = (a > 0.5 || b > 0.5) ? 1 : 0; break;
+            case 'NAND': out = !(a > 0.5 && b > 0.5) ? 1 : 0; break;
+            case 'NOR': out = !(a > 0.5 || b > 0.5) ? 1 : 0; break;
+            case 'XOR': out = (a > 0.5) !== (b > 0.5) ? 1 : 0; break;
+            case 'XNOR': out = (a > 0.5) === (b > 0.5) ? 1 : 0; break;
+            case 'NOT': out = a > 0.5 ? 0 : 1; break;
+            case 'Buffer': out = a > 0.5 ? 1 : 0; break;
+          }
+
+          if (state[gate.id] !== out) {
+            state[gate.id] = out;
+            changed = true;
+          }
+        }
+      }
+
+      for (const outId of outputGateIds) {
+        row.push(state[outId] ?? 0);
+      }
+      rows.push(row);
+    }
+
+    // Waveform Generation
+    const dt = 0.001;
+    const steps = 1000;
+    const totalTime = dt * steps;
+    const time = Array.from({ length: steps }, (_, i) => i * dt);
+    const voltages: Record<string, number[]> = {};
+    headers.forEach(h => voltages[h] = new Array(steps).fill(0));
+
+    if (inputWaveform.type === 'DC' || inputGateIds.length > 1) {
+      // Use Truth Table sequence for voltages if DC or multiple inputs
+      const timePerCombination = steps / numCombinations;
+      for (let i = 0; i < numCombinations; i++) {
+        for (let s = 0; s < timePerCombination; s++) {
+          const idx = Math.floor(i * timePerCombination + s);
+          if (idx < steps) {
+            headers.forEach((h, hIdx) => {
+              voltages[h][idx] = (rows[i][hIdx] as number) * 5; 
+            });
+          }
+        }
+      }
+    } else {
+      // Use actual Input Waveform for the single input gate
+      for (let i = 0; i < steps; i++) {
+        const t = time[i];
+        const vin = getWaveformValue(t, totalTime);
+        const logicIn = vin > 2.5 ? 1 : 0;
+        
+        const state: Record<string, number> = { [inputGateIds[0]]: logicIn };
+        let changed = true;
+        let iterations = 0;
+        while (changed && iterations < 100) {
+          changed = false;
+          iterations++;
+          for (const gate of logicGates) {
+            const inputs = edges
+              .filter(e => e.target === gate.id)
+              .map(e => state[e.source] ?? 0);
+            
+            let out = 0;
+            const a = inputs[0] ?? 0;
+            const b = inputs[1] ?? 0;
+
+            switch (gate.type) {
+              case 'AND': out = (a > 0.5 && b > 0.5) ? 1 : 0; break;
+              case 'OR': out = (a > 0.5 || b > 0.5) ? 1 : 0; break;
+              case 'NAND': out = !(a > 0.5 && b > 0.5) ? 1 : 0; break;
+              case 'NOR': out = !(a > 0.5 || b > 0.5) ? 1 : 0; break;
+              case 'XOR': out = (a > 0.5) !== (b > 0.5) ? 1 : 0; break;
+              case 'XNOR': out = (a > 0.5) === (b > 0.5) ? 1 : 0; break;
+              case 'NOT': out = a > 0.5 ? 0 : 1; break;
+              case 'Buffer': out = a > 0.5 ? 1 : 0; break;
+            }
+
+            if (state[gate.id] !== out) {
+              state[gate.id] = out;
+              changed = true;
+            }
+          }
+        }
+
+        voltages[components[inputGateIds[0]].label][i] = vin;
+        outputGateIds.forEach(id => {
+          voltages[components[id].label][i] = (state[id] ?? 0) * 5;
+        });
+      }
+    }
+
+    setSimulationResult({
+      time,
+      voltages,
+      currents: {},
+      truthTable: { headers, rows }
+    });
+  }, [components, edges, inputWaveform, getWaveformValue]);
+
   const runSimulation = useCallback(() => {
     console.log('Running simulation...');
     
+    // Check if we have logic gates
+    const logicGates = Object.values(components).filter(c => 
+      ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR', 'NOT', 'Buffer'].includes(c.type)
+    );
+
+    if (logicGates.length > 0) {
+      simulateLogicCircuit();
+      return;
+    }
+
     const dt = 0.00001; // 10us steps
     const steps = 5000; // 50ms total
+    const totalTime = dt * steps;
     const time = Array.from({ length: steps }, (_, i) => i * dt);
     
     // Default input voltage
-    const vin = time.map(t => {
-      const phase = (inputWaveform.phase * Math.PI) / 180;
-      const omega = 2 * Math.PI * inputWaveform.frequency;
-      let val = 0;
-      
-      switch (inputWaveform.type) {
-        case 'Sine':
-          val = inputWaveform.amplitude * Math.sin(omega * t + phase);
-          break;
-        case 'Square':
-          val = Math.sin(omega * t + phase) >= 0 ? inputWaveform.amplitude : -inputWaveform.amplitude;
-          break;
-        case 'Triangle':
-          val = (2 * inputWaveform.amplitude / Math.PI) * Math.asin(Math.sin(omega * t + phase));
-          break;
-        case 'DC':
-          val = inputWaveform.amplitude;
-          break;
-      }
-      return val + inputWaveform.offset;
-    });
+    const vin = time.map(t => getWaveformValue(t, totalTime));
 
     // Simple RC Filter or Rectifier Detection
     const resistors = Object.values(components).filter(c => c.type === 'Resistor');

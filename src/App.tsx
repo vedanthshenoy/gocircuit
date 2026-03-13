@@ -4,6 +4,7 @@ import LeftSidebar from './components/layout/LeftSidebar';
 import RightSidebar from './components/layout/RightSidebar';
 import CircuitCanvas from './components/canvas/CircuitCanvas';
 import SelectedWaveformPopup from './components/ui/SelectedWaveformPopup';
+import SelectedTruthTablePopup from './components/ui/SelectedTruthTablePopup';
 import ChatInterface from './components/chat/ChatInterface';
 import { CircuitProvider } from './store/circuit-store';
 
@@ -17,6 +18,7 @@ const App: React.FC = () => {
           <div className="flex-1 flex flex-col relative min-w-0">
             <CircuitCanvas />
             <SelectedWaveformPopup />
+            <SelectedTruthTablePopup />
           </div>
           <RightSidebar />
         </main>

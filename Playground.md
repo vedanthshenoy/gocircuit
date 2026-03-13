@@ -6,15 +6,19 @@ Welcome to the **Circuit Playground**, an interactive, browser-based electronics
 
 - **Interactive Canvas**: Drag and drop components to build your circuit.
 - **Real-time Simulation**: Visualize voltage and current waveforms as you modify the circuit.
-- **Component Toolbox**: A variety of basic electronic components at your fingertips:
+- **Component Toolbox**: A variety of basic electronic and digital logic components at your fingertips:
   - **Resistors**: Control current flow and drop voltage.
-  - **Capacitors**: Store electrical energy in an electric field.
+  - **Capacitors**: Store electrical energy.
   - **Inductors**: Store energy in a magnetic field.
   - **Diodes**: Allow current to flow in one direction.
+  - **Logic Gates**: IEEE standard AND, OR, NAND, NOR, XOR, XNOR, NOT, Buffer.
   - **Voltage Sources**: Provide the driving force for the circuit.
   - **Ground**: The reference point for zero potential.
-- **Custom Waveforms**: Configure input voltage waveforms (Sine, Square, Triangle, DC) with custom amplitude, frequency, and phase.
-- **Visual Feedback**: Real-time graphing of output waveforms using integrated charting.
+- **Custom Waveforms**: Configure input voltage waveforms (Sine, Square, Triangle, DC, Step) with custom amplitude, frequency, and phase.
+- **Visual Feedback**: Real-time graphing of output waveforms and automatic **Truth Table** generation for digital logic circuits.
+- **Interactive Popup**: Select any logic gate to view its specific truth table and logic properties instantly.
+- **Vertical Scrolling**: A scrollable toolbox allows for easy access to a growing list of components.
+
 
 ## Chat Interface & Agent
 The playground includes an intelligent **Circuit Agent** to assist you.

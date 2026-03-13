@@ -10,34 +10,14 @@ const ComponentNode = memo(({ data, selected }: NodeProps<CircuitComponent>) => 
     transform: `rotate(${rotation * 90}deg)`,
   };
   
-  // Adjust handle positions based on rotation
-  // 0: Left-Right
-  // 1: Top-Bottom
-  // 2: Right-Left
-  // 3: Bottom-Top
-  
-  // Actually, if we rotate the whole container, handles rotate too.
-  // But we need to keep label upright?
-  // Let's just rotate the graphic and handles container.
-
   const getHandlePosition = (basePosition: Position) => {
-    const r = ((rotation % 4) + 4) % 4; // Ensure positive 0-3
-    if (r === 0) return basePosition;
-    
-    // Mapping for rotation (clockwise)
-    // 0: L->L, R->R
-    // 1: L->T, R->B
-    // 2: L->R, R->L
-    // 3: L->B, R->T
-    
-    if (basePosition === Position.Left) {
-      return [Position.Left, Position.Top, Position.Right, Position.Bottom][r];
-    }
-    if (basePosition === Position.Right) {
-      return [Position.Right, Position.Bottom, Position.Left, Position.Top][r];
-    }
-    return basePosition;
+    const r = ((rotation % 4) + 4) % 4;
+    const positions = [Position.Left, Position.Top, Position.Right, Position.Bottom];
+    const index = positions.indexOf(basePosition);
+    return positions[(index + r) % 4];
   };
+
+  const isTwoInput = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR'].includes(type);
 
   return (
     <div 
@@ -46,29 +26,46 @@ const ComponentNode = memo(({ data, selected }: NodeProps<CircuitComponent>) => 
         selected ? "ring-2 ring-blue-500 bg-blue-500/10" : "hover:bg-slate-800/50"
       )}
     >
-      <div style={rotateStyle} className="relative w-12 h-12 flex items-center justify-center">
-        {/* Component Graphic */}
+      <div style={rotateStyle} className="relative w-20 h-16 flex items-center justify-center">
         <div className="text-slate-200">
            {getComponentGraphic(type)}
         </div>
 
-        {/* Handles */}
-        <Handle
-          type="target"
-          position={getHandlePosition(Position.Left)}
-          id="a"
-          className="!w-3 !h-3 !bg-slate-400 !border-2 !border-slate-800 hover:!bg-blue-400"
-        />
+        {isTwoInput ? (
+          <>
+            <Handle
+              type="target"
+              position={getHandlePosition(Position.Left)}
+              id="in1"
+              style={{ top: '35%' }}
+              className="!w-2.5 !h-2.5 !bg-slate-400 !border-2 !border-slate-800 hover:!bg-blue-400"
+            />
+            <Handle
+              type="target"
+              position={getHandlePosition(Position.Left)}
+              id="in2"
+              style={{ top: '65%' }}
+              className="!w-2.5 !h-2.5 !bg-slate-400 !border-2 !border-slate-800 hover:!bg-blue-400"
+            />
+          </>
+        ) : (
+          <Handle
+            type="target"
+            position={getHandlePosition(Position.Left)}
+            id="a"
+            className="!w-3 !h-3 !bg-slate-400 !border-2 !border-slate-800 hover:!bg-blue-400"
+          />
+        )}
+        
         <Handle
           type="source"
           position={getHandlePosition(Position.Right)}
-          id="b"
+          id="out"
           className="!w-3 !h-3 !bg-slate-400 !border-2 !border-slate-800 hover:!bg-blue-400"
         />
       </div>
 
-      {/* Label (always upright-ish or below) */}
-      <div className="absolute -bottom-6 w-32 text-center pointer-events-none">
+      <div className="absolute -bottom-8 w-32 text-center pointer-events-none">
         <div className="text-[10px] font-bold text-slate-300 truncate">{label}</div>
         <div className="text-[9px] text-slate-500">
           {['Resistor', 'Capacitor', 'Inductor', 'VoltageSource'].includes(type) && (
@@ -82,62 +79,130 @@ const ComponentNode = memo(({ data, selected }: NodeProps<CircuitComponent>) => 
 
 function getComponentGraphic(type: CircuitComponent['type']) {
   switch (type) {
+    case 'AND':
+      return (
+        <svg width="60" height="40" viewBox="0 0 60 40" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M10 5 H30 C45 5 45 35 30 35 H10 V5 Z" />
+          <line x1="0" y1="12" x2="10" y2="12" />
+          <line x1="0" y1="28" x2="10" y2="28" />
+          <line x1="42" y1="20" x2="60" y2="20" />
+        </svg>
+      );
+    case 'OR':
+      return (
+        <svg width="60" height="40" viewBox="0 0 60 40" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M8 5 Q18 20 8 35 Q35 35 45 20 Q35 5 8 5 Z" />
+          <line x1="0" y1="12" x2="12" y2="12" />
+          <line x1="0" y1="28" x2="12" y2="28" />
+          <line x1="45" y1="20" x2="60" y2="20" />
+        </svg>
+      );
+    case 'NAND':
+      return (
+        <svg width="60" height="40" viewBox="0 0 60 40" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M10 5 H25 C40 5 40 35 25 35 H10 V5 Z" />
+          <circle cx="43" cy="20" r="3.5" strokeWidth="2" />
+          <line x1="0" y1="12" x2="10" y2="12" />
+          <line x1="0" y1="28" x2="10" y2="28" />
+          <line x1="47" y1="20" x2="60" y2="20" />
+        </svg>
+      );
+    case 'NOR':
+      return (
+        <svg width="60" height="40" viewBox="0 0 60 40" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M8 5 Q18 20 8 35 Q32 35 40 20 Q32 5 8 5 Z" />
+          <circle cx="45" cy="20" r="3.5" strokeWidth="2" />
+          <line x1="0" y1="12" x2="13" y2="12" />
+          <line x1="0" y1="28" x2="13" y2="28" />
+          <line x1="49" y1="20" x2="60" y2="20" />
+        </svg>
+      );
+    case 'XOR':
+      return (
+        <svg width="60" height="40" viewBox="0 0 60 40" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M3 5 Q13 20 3 35" />
+          <path d="M10 5 Q20 20 10 35 Q37 35 47 20 Q37 5 10 5 Z" />
+          <line x1="0" y1="12" x2="6" y2="12" />
+          <line x1="0" y1="28" x2="6" y2="28" />
+          <line x1="47" y1="20" x2="60" y2="20" />
+        </svg>
+      );
+    case 'XNOR':
+      return (
+        <svg width="60" height="40" viewBox="0 0 60 40" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M3 5 Q13 20 3 35" />
+          <path d="M10 5 Q20 20 10 35 Q32 35 42 20 Q32 5 10 5 Z" />
+          <circle cx="46" cy="20" r="3.5" strokeWidth="2" />
+          <line x1="0" y1="12" x2="6" y2="12" />
+          <line x1="0" y1="28" x2="6" y2="28" />
+          <line x1="50" y1="20" x2="60" y2="20" />
+        </svg>
+      );
+    case 'NOT':
+      return (
+        <svg width="60" height="40" viewBox="0 0 60 40" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M15 8 L35 20 L15 32 Z" />
+          <circle cx="40" cy="20" r="3.5" strokeWidth="2" />
+          <line x1="0" y1="20" x2="15" y2="20" />
+          <line x1="44" y1="20" x2="60" y2="20" />
+        </svg>
+      );
+    case 'Buffer':
+      return (
+        <svg width="60" height="40" viewBox="0 0 60 40" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M15 8 L40 20 L15 32 Z" />
+          <line x1="0" y1="20" x2="15" y2="20" />
+          <line x1="40" y1="20" x2="60" y2="20" />
+        </svg>
+      );
     case 'Resistor':
       return (
-        <svg width="40" height="20" viewBox="0 0 40 20" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M0 10 H5 L10 5 L15 15 L20 5 L25 15 L30 5 L35 10 H40" />
+        <svg width="60" height="20" viewBox="0 0 60 20" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M0 10 H10 L15 3 L25 17 L35 3 L45 17 L50 10 H60" />
         </svg>
       );
     case 'Capacitor':
       return (
-        <svg width="40" height="20" viewBox="0 0 40 20" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M0 10 H16" />
-          <path d="M24 10 H40" />
-          <line x1="16" y1="2" x2="16" y2="18" />
-          <line x1="24" y1="2" x2="24" y2="18" />
+        <svg width="60" height="30" viewBox="0 0 60 30" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M0 15 H25" />
+          <path d="M35 15 H60" />
+          <line x1="25" y1="5" x2="25" y2="25" />
+          <line x1="35" y1="5" x2="35" y2="25" />
         </svg>
       );
     case 'Inductor':
       return (
-        <svg width="40" height="20" viewBox="0 0 40 20" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M0 10 H5 Q10 -5 15 10 Q20 -5 25 10 Q30 -5 35 10 H40" />
+        <svg width="60" height="20" viewBox="0 0 60 20" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M0 10 H10 Q15 0 20 10 Q25 0 30 10 Q35 0 40 10 Q45 0 50 10 H60" />
         </svg>
       );
     case 'Diode':
       return (
-        <svg width="40" height="20" viewBox="0 0 40 20" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M0 10 H14" />
-          <path d="M26 10 H40" />
-          <path d="M14 10 L26 4 V16 Z" fill="currentColor" />
-          <line x1="26" y1="4" x2="26" y2="16" />
+        <svg width="60" height="30" viewBox="0 0 60 30" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M0 15 H22" />
+          <path d="M38 15 H60" />
+          <path d="M22 15 L38 5 V25 Z" fill="currentColor" />
+          <line x1="38" y1="5" x2="38" y2="25" />
         </svg>
       );
     case 'VoltageSource':
       return (
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="20" cy="20" r="14" />
-          <path d="M20 10 V16" />
-          <path d="M17 13 H23" />
-          <path d="M20 24 V30" />
-          <path d="M17 27 H23" /> {/* Wait, simple + and - */}
-          {/* DC Source symbol */}
-          <path d="M20 6 V20 M20 20 V34" stroke="transparent" /> {/* connection lines */}
-          
-          {/* redraw better */}
-          <path d="M20 0 V6" />
-          <path d="M20 34 V40" />
-          <path d="M20 10 V18" strokeWidth="1" /> 
-          <text x="14" y="16" fontSize="10" fill="currentColor">+</text>
-          <text x="14" y="28" fontSize="10" fill="currentColor">-</text>
+        <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="30" cy="30" r="20" />
+          <path d="M30 18 V26" strokeWidth="1.5" />
+          <path d="M26 22 H34" strokeWidth="1.5" />
+          <path d="M26 38 H34" strokeWidth="1.5" />
+          <path d="M30 0 V10" />
+          <path d="M30 50 V60" />
         </svg>
       );
      case 'Ground':
       return (
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" strokeWidth="2">
-           <path d="M20 0 V20" />
-           <path d="M10 20 H30" />
-           <path d="M14 26 H26" />
-           <path d="M18 32 H22" />
+        <svg width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="currentColor" strokeWidth="2">
+           <path d="M30 0 V30" />
+           <path d="M15 30 H45" />
+           <path d="M20 38 H40" />
+           <path d="M26 46 H34" />
         </svg>
       );
     default:
