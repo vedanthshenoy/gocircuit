@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, type ReactNode, useEffect } from 'react';
 import { 
   type Node, 
   type Edge, 
@@ -13,6 +13,14 @@ import {
   type NodeChange
 } from 'reactflow';
 import { type CircuitComponent, type SimulationResult, type InputWaveform } from '../types/circuit';
+
+// A probe point can be on a component (node) or a wire (edge)
+export interface ProbePoint {
+  id: string;
+  x: number;
+  y: number;
+  nodeId: string | null;
+}
 
 interface CircuitContextType {
   nodes: Node[];
@@ -33,6 +41,16 @@ interface CircuitContextType {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   setComponents: React.Dispatch<React.SetStateAction<Record<string, CircuitComponent>>>;
+  highlightedIds: string[];
+  setHighlightedIds: (ids: string[]) => void;
+  
+  // New two-point probing system
+  isProbing: boolean;
+  toggleProbing: () => void;
+  probePoints: ProbePoint[];
+  addProbePoint: (point: Omit<ProbePoint, 'id'>) => void;
+  clearProbePoints: () => void;
+  probeVoltage: number[] | null;
 }
 
 const CircuitContext = createContext<CircuitContextType | undefined>(undefined);
@@ -51,6 +69,7 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [components, setComponents] = useState<Record<string, CircuitComponent>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
+  const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
   const [inputWaveform, setInputWaveform] = useState<InputWaveform>({
     type: 'Sine',
     amplitude: 50,
@@ -58,6 +77,60 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
     offset: 0,
     phase: 0
   });
+
+  // --- New Two-Point Probing State ---
+  const [isProbing, setIsProbing] = useState(false);
+  const [probePoints, setProbePoints] = useState<ProbePoint[]>([]);
+  const [probeVoltage, setProbeVoltage] = useState<number[] | null>(null);
+
+  const clearProbePoints = useCallback(() => {
+    setProbePoints([]);
+    setProbeVoltage(null);
+  }, []);
+
+  const toggleProbing = useCallback(() => {
+    setIsProbing(prev => {
+      if (prev) { // When turning off
+        clearProbePoints();
+      }
+      return !prev;
+    });
+  }, [clearProbePoints]);
+
+  const addProbePoint = useCallback((point: Omit<ProbePoint, 'id'>) => {
+    setProbePoints(prev => {
+      if (prev.length >= 2) {
+        return [{ ...point, id: crypto.randomUUID() }];
+      }
+      return [...prev, { ...point, id: crypto.randomUUID() }];
+    });
+  }, []);
+
+  // Effect to calculate voltage when two probe points are set
+  useEffect(() => {
+    if (probePoints.length === 2 && simulationResult?.voltages) {
+      const p1NodeId = probePoints[0].nodeId;
+      const p2NodeId = probePoints[1].nodeId;
+
+      if (!p1NodeId || !p2NodeId) {
+        setProbeVoltage(null);
+        return;
+      }
+      
+      const v1 = simulationResult.voltages[p1NodeId] ?? simulationResult.voltages['Out'];
+      const v2 = simulationResult.voltages[p2NodeId] ?? simulationResult.voltages['Out'];
+
+      if (v1 && v2) {
+        const diff = v1.map((val, i) => val - v2[i]);
+        setProbeVoltage(diff);
+      } else {
+        setProbeVoltage(null)
+      }
+    } else {
+      setProbeVoltage(null);
+    }
+  }, [probePoints, simulationResult]);
+
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -155,8 +228,12 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
   const runSimulation = useCallback(() => {
     console.log('Running simulation...');
     
-    const dt = 0.00001; // 10us steps
-    const steps = 5000; // 50ms total
+    // Adjust time window to show ~3 cycles based on frequency
+    const cycles = 3;
+    const freq = Math.max(inputWaveform.frequency, 1);
+    const totalTime = cycles / freq;
+    const steps = 2000; // Keep fixed steps for consistent rendering performance
+    const dt = totalTime / steps;
     const time = Array.from({ length: steps }, (_, i) => i * dt);
     
     // Default input voltage
@@ -319,7 +396,16 @@ export const CircuitProvider: React.FC<{ children: ReactNode }> = ({ children })
       setInputWaveform,
       setNodes,
       setEdges,
-      setComponents
+      setComponents,
+      highlightedIds,
+      setHighlightedIds,
+      
+      isProbing,
+      toggleProbing,
+      probePoints,
+      addProbePoint,
+      clearProbePoints,
+      probeVoltage
     }}>
       {children}
     </CircuitContext.Provider>

@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+/* Add this to give visual feedback when probing */
+.probing-cursor .react-flow__viewport {
+  cursor: crosshair !important;
+}

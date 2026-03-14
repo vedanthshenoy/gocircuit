@@ -5,12 +5,14 @@ import ReactFlow, {
   ReactFlowProvider,
   type NodeTypes,
   MiniMap,
-  useReactFlow
+  useReactFlow,
+  type Node
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useCircuit } from '../../store/circuit-store';
 import ComponentNode from './ComponentNode';
 import { type ComponentType } from '../../types/circuit';
+import ProbeMarker from './ProbeMarker';
 
 const nodeTypes: NodeTypes = {
   circuitComponent: ComponentNode,
@@ -26,7 +28,11 @@ const CanvasContent: React.FC = () => {
     onEdgesChange, 
     onConnect, 
     addComponent,
-    setSelectedId
+    setSelectedId,
+    isProbing,
+    addProbePoint,
+    probePoints,
+    clearProbePoints,
   } = useCircuit();
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -64,6 +70,23 @@ const CanvasContent: React.FC = () => {
     }
   }, [setSelectedId]);
 
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    if (isProbing) {
+      event.stopPropagation(); // Prevent selection while probing
+      addProbePoint({ 
+        x: node.position.x, 
+        y: node.position.y,
+        nodeId: node.id
+      });
+    }
+  }, [isProbing, addProbePoint]);
+  
+  const onPaneClick = useCallback(() => {
+    if(isProbing) {
+      clearProbePoints();
+    }
+  }, [isProbing, clearProbePoints]);
+
   return (
     <div className="flex-1 h-full bg-slate-950 relative" ref={wrapperRef}>
       <ReactFlow
@@ -76,6 +99,8 @@ const CanvasContent: React.FC = () => {
         onDragOver={onDragOver}
         onDrop={onDrop}
         onSelectionChange={onSelectionChange}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         fitView
         snapToGrid
         snapGrid={[20, 20]}
@@ -84,6 +109,11 @@ const CanvasContent: React.FC = () => {
           style: { strokeWidth: 2, stroke: '#94a3b8' },
           animated: false,
         }}
+        // Prevent selection/dragging when in probing mode to make clicking easier
+        nodesDraggable={!isProbing}
+        nodesConnectable={!isProbing}
+        elementsSelectable={!isProbing}
+        className={isProbing ? 'probing-cursor' : ''}
       >
         <Background color="#334155" gap={20} size={1} />
         <Controls className="!bg-slate-800 !border-slate-700 !text-slate-200" />
@@ -92,6 +122,9 @@ const CanvasContent: React.FC = () => {
           maskColor="rgba(30, 41, 59, 0.6)"
           nodeColor="#60a5fa"
         />
+        {probePoints.map((point, index) => (
+          <ProbeMarker key={point.id} point={point} index={index + 1} />
+        ))}
       </ReactFlow>
     </div>
   );

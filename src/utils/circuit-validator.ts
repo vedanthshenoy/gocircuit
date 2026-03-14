@@ -8,7 +8,7 @@ export interface ValidationResult {
 }
 
 export function validateCircuit(
-  nodes: Node[],
+  _nodes: Node[],
   edges: Edge[],
   components: Record<string, CircuitComponent>
 ): ValidationResult {
@@ -16,9 +16,12 @@ export function validateCircuit(
   const warnings: string[] = [];
 
   // 1. Check for Ground
-  const hasGround = Object.values(components).some(c => c.type === 'Ground');
+  const groundNodes = Object.keys(components).filter(id => components[id].type === 'Ground');
+  const hasGround = groundNodes.length > 0;
   if (!hasGround) {
     errors.push("Missing Ground reference. Every circuit needs at least one Ground node.");
+  } else if (groundNodes.length > 1) {
+    warnings.push("Multiple Ground nodes detected. Ensure they are all electrically connected to the same reference point.");
   }
 
   // 2. Check for Voltage Source
@@ -117,7 +120,6 @@ export function validateCircuit(
 
     // 6. Connectivity Check (Path to Ground)
     // Ensure every component has a path to a Ground node
-    const groundNodes = Object.keys(components).filter(id => components[id].type === 'Ground');
     if (groundNodes.length > 0) {
     const visited = new Set<string>();
     const queue = [...groundNodes];
@@ -189,7 +191,6 @@ export function validateCircuit(
       const otherId = isSourceV ? edge.target : isTargetV ? edge.source : null;
       const otherComp = otherId ? components[otherId] : null;
       const vHandle = isSourceV ? edge.sourceHandle : isTargetV ? edge.targetHandle : null;
-      const otherHandle = isSourceV ? edge.targetHandle : isTargetV ? edge.sourceHandle : null;
 
       if (isSourceV && isTargetV) {
         if ((edge.sourceHandle === 'a' && edge.targetHandle === 'b') || 

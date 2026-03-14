@@ -21,6 +21,7 @@ dotenv.config({ path: path.resolve(ROOT_DIR, ".env") });
 const CIRCUIT_FILE = path.join(ROOT_DIR, "circuit.md");
 const HISTORY_FILE = path.join(ROOT_DIR, "history.md");
 const SCRATCHPAD_FILE = path.join(ROOT_DIR, "waveform_scratchpad.txt");
+const SCRIPT_FILE = path.join(ROOT_DIR, "script.md");
 
 function updateSyncFiles(changeDescription: string, circuitState?: any) {
   const timestamp = new Date().toISOString();
@@ -40,6 +41,25 @@ ${changeDescription}
 ${circuitState ? JSON.stringify(circuitState, null, 2) : "Check circuit.md for full state."}
 `;
   fs.writeFileSync(SCRATCHPAD_FILE, scratchpadContent);
+}
+
+function appendToScript(simulationData: any) {
+  const timestamp = new Date().toISOString();
+  const scriptEntry = `
+## Simulation Run: ${timestamp}
+### Input Waveform
+- Type: ${simulationData.input.type}
+- Amplitude: ${simulationData.input.amplitude}V
+- Frequency: ${simulationData.input.frequency}Hz
+- Offset: ${simulationData.input.offset}V
+- Phase: ${simulationData.input.phase}°
+
+### Results
+- Output Nodes: ${Object.keys(simulationData.results.voltages).join(', ')}
+- Data Points: ${simulationData.results.time.length}
+- Summary: Simulation completed successfully.
+`;
+  fs.appendFileSync(SCRIPT_FILE, scriptEntry);
 }
 
 const API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
@@ -229,10 +249,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "run_simulation",
-        description: "Run the electronic simulation and get the results.",
+        description: "Run the electronic simulation and get the results. Should be called with the current input and result data to sync with the agent context.",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            input: {
+              type: "object",
+              properties: {
+                type: { type: "string" },
+                amplitude: { type: "number" },
+                frequency: { type: "number" },
+                offset: { type: "number" },
+                phase: { type: "number" }
+              }
+            },
+            results: {
+              type: "object",
+              properties: {
+                time: { type: "array", items: { type: "number" } },
+                voltages: { type: "object", additionalProperties: { type: "array", items: { type: "number" } } }
+              }
+            }
+          }
         },
       },
       {
@@ -286,18 +324,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [{ type: "text", text: `Connected ${args?.sourceId} to ${args?.targetId}.` }],
       };
     case "run_simulation":
-      updateSyncFiles("Ran circuit simulation");
+      updateSyncFiles("Ran circuit simulation", args);
+      if (args?.input && args?.results) {
+        appendToScript(args);
+      }
       return {
         content: [
           { 
             type: "text", 
             text: JSON.stringify({
               status: "success",
-              message: "Simulation complete.",
-              data: {
-                time: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
-                voltage: [0, 2.5, 4.3, 4.8, 4.9, 5.0]
-              }
+              message: "Simulation synced with agent context and script.md.",
+              details: args?.input ? `Input: ${args.input.type} ${args.input.amplitude}V` : "No input data provided"
             }, null, 2)
           }
         ],

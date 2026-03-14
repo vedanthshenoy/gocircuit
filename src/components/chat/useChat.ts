@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useCircuit } from '../../store/circuit-store';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { validateCircuit } from '../../utils/circuit-validator';
@@ -24,7 +24,7 @@ const PRIMARY_MODEL = "gemini-2.5-flash";
 const FALLBACK_MODEL = "gemini-2.5-pro";
 
 export const useChat = () => {
-  const { components, edges, inputWaveform, setNodes, setEdges, setComponents, setInputWaveform, runSimulation } = useCircuit();
+  const { components, edges, inputWaveform, setNodes, setEdges, setComponents, setInputWaveform, runSimulation, setHighlightedIds } = useCircuit();
   const [state, setState] = useState<ChatState>({
     messages: [
       {
@@ -38,6 +38,30 @@ export const useChat = () => {
     step: 'idle',
     requirementText: '',
   });
+
+  // Effect to handle highlighting based on bold text in assistant messages
+  useEffect(() => {
+    const lastMessage = state.messages[state.messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant') {
+      const boldRegex = /\*\*([^*]+)\*\*/g;
+      const matches = [...lastMessage.content.matchAll(boldRegex)];
+      const labelsToHighlight = matches.map(m => m[1].trim().toUpperCase());
+      
+      if (labelsToHighlight.length > 0) {
+        const idsToHighlight = Object.entries(components)
+          .filter(([_, comp]) => labelsToHighlight.includes(comp.label.toUpperCase()))
+          .map(([id]) => id);
+        
+        setHighlightedIds(idsToHighlight);
+        
+        // Auto-clear after 10 seconds
+        const timer = setTimeout(() => setHighlightedIds([]), 10000);
+        return () => clearTimeout(timer);
+      } else {
+        setHighlightedIds([]);
+      }
+    }
+  }, [state.messages, components, setHighlightedIds]);
 
   const generateWithFallback = async (prompt: string, history: any[] = []) => {
     if (!genAI) throw new Error("GenAI not initialized");
@@ -161,6 +185,9 @@ export const useChat = () => {
             - VoltageSource and Ground are VERTICAL by default at rotation 0.
           - Use handle 'a' for Input/Positive and 'b' for Output/Negative.
           - For Ground, use handle 'a'.
+          - GROUND POLICY: 
+            - Prefer a single Ground component.
+            - If multiple Ground components are used for layout neatness, they MUST be connected together with wires to ensure they represent the same electrical node.
 
           Return ONLY a JSON object with the following structure:
           {

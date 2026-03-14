@@ -1,10 +1,14 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { type CircuitComponent } from '../../types/circuit';
+import { useCircuit } from '../../store/circuit-store';
 import { clsx } from 'clsx';
 
-const ComponentNode = memo(({ data, selected }: NodeProps<CircuitComponent>) => {
+const ComponentNode = memo(({ id, data, selected }: NodeProps<CircuitComponent>) => {
   const { type, label, value, unit, rotation } = data;
+  const { highlightedIds } = useCircuit();
+
+  const isHighlighted = useMemo(() => highlightedIds.includes(id), [highlightedIds, id]);
 
   const rotateStyle = {
     transform: `rotate(${rotation * 90}deg)`,
@@ -32,7 +36,8 @@ const ComponentNode = memo(({ data, selected }: NodeProps<CircuitComponent>) => 
     <div 
       className={clsx(
         "relative flex flex-col items-center justify-center rounded transition-all",
-        selected ? "ring-2 ring-blue-500 bg-blue-500/10" : "hover:bg-slate-800/50"
+        selected ? "ring-2 ring-blue-500 bg-blue-500/10" : "hover:bg-slate-800/50",
+        isHighlighted && "ring-4 ring-yellow-400 bg-yellow-400/20 shadow-[0_0_15px_rgba(250,204,21,0.5)] animate-pulse"
       )}
     >
       {/* Container for Graphic and Handles - Graphic rotates, Handles move logically */}
