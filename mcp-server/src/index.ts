@@ -6,67 +6,17 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as dotenv from "dotenv";
 import * as path from "path";
-import * as fs from "fs";
 import { fileURLToPath } from "url";
+import * as tools from "./tools/index.js";
+import { mainAgent } from "./agents/main-agent.js";
 
 // Load .env from project root
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "../../");
 dotenv.config({ path: path.resolve(ROOT_DIR, ".env") });
-
-const CIRCUIT_FILE = path.join(ROOT_DIR, "circuit.md");
-const HISTORY_FILE = path.join(ROOT_DIR, "history.md");
-const SCRATCHPAD_FILE = path.join(ROOT_DIR, "waveform_scratchpad.txt");
-
-function updateSyncFiles(changeDescription: string, circuitState?: any) {
-  const timestamp = new Date().toISOString();
-  
-  // 1. Update history.md
-  const historyEntry = `\n## ${timestamp}\n- ${changeDescription}\n`;
-  fs.appendFileSync(HISTORY_FILE, historyEntry);
-
-  // 2. Update waveform_scratchpad.txt
-  const scratchpadContent = `# Waveform Scratchpad
-Last Updated: ${timestamp}
-
-## Current Change
-${changeDescription}
-
-## Circuit Context
-${circuitState ? JSON.stringify(circuitState, null, 2) : "Check circuit.md for full state."}
-`;
-  fs.writeFileSync(SCRATCHPAD_FILE, scratchpadContent);
-}
-
-const API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
-
-const PRIMARY_MODEL = "gemini-2.5-flash";
-const FALLBACK_MODEL = "gemini-2.5-pro";
-
-async function generateWithFallback(prompt: string) {
-  if (!genAI) throw new Error("GenAI not initialized");
-  
-  try {
-    const model = genAI.getGenerativeModel({ model: PRIMARY_MODEL });
-    const result = await model.generateContent(prompt);
-    return result.response.text();
-  } catch (error) {
-    console.error(`Primary model (${PRIMARY_MODEL}) failed, trying fallback (${FALLBACK_MODEL})...`, error);
-    try {
-      const model = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
-      const result = await model.generateContent(prompt);
-      return result.response.text();
-    } catch (fallbackError) {
-      console.error(`Fallback model (${FALLBACK_MODEL}) also failed:`, fallbackError);
-      throw fallbackError;
-    }
-  }
-}
 
 const server = new Server(
   {
@@ -161,6 +111,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
+        name: "ask_circuit_agent",
+        description: "Ask the AI Circuit Agent to help with circuit design, modification, or analysis. It can perform complex tasks.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "The request or question for the agent." },
+          },
+          required: ["query"],
+        },
+      },
+      {
         name: "select_component",
         description: "Select a component in the circuit to view or edit its properties.",
         inputSchema: {
@@ -254,56 +215,40 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  switch (name) {
-    case "sync_chat":
-      updateSyncFiles(`Chat [${args?.role}]: ${args?.content}`);
-      return {
-        content: [{ type: "text", text: "Chat message synchronized." }],
-      };
-    case "select_component":
-      updateSyncFiles(`Selected component: ${args?.id}`);
-      return {
-        content: [{ type: "text", text: `Component ${args?.id} selected.` }],
-      };
-    case "add_component":
-      updateSyncFiles(`Added component: ${args?.type} at (${args?.x}, ${args?.y})`, args);
-      return {
-        content: [{ type: "text", text: `Added ${args?.type} at (${args?.x}, ${args?.y}).` }],
-      };
-    case "update_component":
-      updateSyncFiles(`Updated component: ${args?.id}`, args);
-      return {
-        content: [{ type: "text", text: `Updated component ${args?.id} with new properties.` }],
-      };
-    case "delete_component":
-      updateSyncFiles(`Deleted component: ${args?.id}`);
-      return {
-        content: [{ type: "text", text: `Deleted component ${args?.id}.` }],
-      };
-    case "connect_components":
-      updateSyncFiles(`Connected ${args?.sourceId} to ${args?.targetId}`, args);
-      return {
-        content: [{ type: "text", text: `Connected ${args?.sourceId} to ${args?.targetId}.` }],
-      };
-    case "run_simulation":
-      updateSyncFiles("Ran circuit simulation");
-      return {
-        content: [
-          { 
-            type: "text", 
-            text: JSON.stringify({
-              status: "success",
-              message: "Simulation complete.",
-              data: {
-                time: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
-                voltage: [0, 2.5, 4.3, 4.8, 4.9, 5.0]
-              }
-            }, null, 2)
-          }
-        ],
-      };
-    default:
-      throw new Error(`Tool not found: ${name}`);
+  try {
+    switch (name) {
+      case "ask_circuit_agent":
+        if (!args || typeof args.query !== "string") {
+          throw new Error("Invalid arguments for ask_circuit_agent: query is required.");
+        }
+        const agentResponse = await mainAgent.run(args.query);
+        // Assuming agentResponse.text is the output string
+        return {
+          content: [{ type: "text", text: agentResponse.text || JSON.stringify(agentResponse) }],
+        };
+      case "sync_chat":
+        return { content: [{ type: "text", text: tools.sync_chat(args) }] };
+      case "select_component":
+        return { content: [{ type: "text", text: tools.select_component(args) }] };
+      case "add_component":
+        return { content: [{ type: "text", text: tools.add_component(args) }] };
+      case "update_component":
+        return { content: [{ type: "text", text: tools.update_component(args) }] };
+      case "delete_component":
+        return { content: [{ type: "text", text: tools.delete_component(args) }] };
+      case "connect_components":
+        return { content: [{ type: "text", text: tools.connect_components(args) }] };
+      case "run_simulation":
+        return { content: [{ type: "text", text: tools.run_simulation() }] };
+      default:
+        throw new Error(`Tool not found: ${name}`);
+    }
+  } catch (error: any) {
+    console.error(`Error executing tool ${name}:`, error);
+    return {
+      content: [{ type: "text", text: `Error: ${error.message}` }],
+      isError: true,
+    };
   }
 });
 
