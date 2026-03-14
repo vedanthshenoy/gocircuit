@@ -1,73 +1,49 @@
-# React + TypeScript + Vite
+# Circuit Playground
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A visually rich, interactive electronic circuit simulation and design environment.
 
-Currently, two official plugins are available:
+## AI Agent Architecture (ADK Implementation)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The project utilizes the **Google Agent Development Kit (ADK)** to implement a multi-agent system for circuit design and analysis. This architecture is exposed via a **Model Context Protocol (MCP)** server.
 
-## React Compiler
+### Agents
+- **Main Agent**: The primary orchestrator. Handles high-level circuit design, component management (add, update, delete, connect), and user communication. It can delegate complex tasks to specialized subagents.
+- **Waveform Agent (Subagent)**: Specialized in simulation and waveform analysis. It derives mathematical models (transfer functions, differential equations) and processes simulation data to provide accurate output waveforms.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### MCP Server Integration
+The backend in `mcp-server/` acts as the bridge between the AI agents and the playground. It exposes tools that the agents use to interact with the circuit and a high-level `ask_circuit_agent` tool for users.
 
-## Expanding the ESLint configuration
+#### Setup (MCP Server)
+1. Navigate to the `mcp-server` directory:
+   ```bash
+   cd mcp-server
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Build the server:
+   ```bash
+   npm run build
+   ```
+4. Start the server:
+   ```bash
+   npm start
+   ```
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Development
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Frontend (React + Vite)
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Technologies Used
+- **Frontend**: React 19, TypeScript, Vite, ReactFlow, Recharts, Tailwind CSS.
+- **AI**: Google Agent Development Kit (ADK), Gemini 2.5 models.
+- **Protocol**: Model Context Protocol (MCP).
